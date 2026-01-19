@@ -1,141 +1,58 @@
 use crate::wordlist::N;
-use crate::wordlist::WL_SOL;
-use rand::seq::SliceRandom;
+use crate::wordlist::N_TEST;
+use crate::wordlist::N_SOL;
+use crate::wordlist::WL_TEST;
+use crate::pattern::PatternTable;
+
 
 pub mod wordlist;
+pub mod pattern;
+pub mod colors;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum ResColor {
-    Green,
-    Yellow,
-    Gray,
+#[inline]
+fn entropy(n_bucket: u16, n_sol: usize) -> f64 {
+    let p = (n_bucket as f64) / (n_sol as f64);
+    -p * p.log2()
 }
 
-const fn color_priority(c: ResColor) -> u8 {
-    match c {
-        ResColor::Green => 0,
-        ResColor::Yellow => 1,
-        ResColor::Gray => 2,
-    }
-}
+fn entropy_solver(pats: &PatternTable, _depth: u8, n_sol: usize) -> usize {
+    let mut max_s = -f64::INFINITY;
+    let mut best = 0usize;
+    let mut buckets = [0u16; 1 << (2 * N)];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct NaiveRes {
-    colors: [ResColor; N],
-    testword: [u8; N],
-}
+    for i in 0..N_TEST {
+        print!("\r{} / {}", i + 1, N_TEST);
 
-fn naive_test(t: [u8; N], s: [u8; N]) -> NaiveRes {
-    let mut skip = [false; N];
-    let mut c = [ResColor::Gray; N];
+        pats.fill_buckets(i, &mut buckets);
 
-    for (i, &tl) in t.iter().enumerate() {
-        if s[i] == tl {
-            skip[i] = true;
-            c[i] = ResColor::Green;
-        };
-    }
+        let mut s = 0f64;
+        for &n in &buckets {
+            if n > 0 {
+                s += entropy(n, n_sol);
+            }
+        }
 
-    let mut skip_s = skip;
-
-    for (i, &tl) in t.iter().enumerate() {
-        if skip[i] {
-            continue;
-        };
-
-        if let Some((j, _)) = s
-            .iter()
-            .enumerate()
-            .filter(|&(j, _)| !skip_s[j])
-            .find(|&(_, &sl)| sl == tl)
-        {
-            c[i] = ResColor::Yellow;
-            skip_s[j] = true;
+        if s > max_s {
+            best = i;
+            max_s = s;
         }
     }
-    NaiveRes {
-        colors: c,
-        testword: t,
-    }
-}
 
-const BASE_ORDER: [usize; N] = {
-    let mut a = [0usize; N];
-    let mut i = 0;
-    while i < N {
-        a[i] =  i;
-        i += 1;
-    }
-    a
-};
-
-fn naive_is_compatible(
-    res: NaiveRes,
-    w: [u8; N],
-) -> bool {
-    let t = res.testword;
-    let colors = res.colors;
-    let mut order = BASE_ORDER;
-
-    let mut freq = [0u8; 26];
-    for &c in w.iter() {
-        freq[(c - b'A') as usize] += 1;
-    }
-
-    order.sort_unstable_by_key(|&i| color_priority(colors[i]));
-
-    // println!("{:?}", colors);
-    // println!("{:?}", vec);
-
-    for i in order {
-        match colors[i] {
-            ResColor::Green => {
-                if t[i] == w[i] {
-                    freq[(t[i] - b'A') as usize] -= 1;
-                } else {
-                    return false;
-                }
-            }
-            ResColor::Yellow => {
-                let idx = (t[i] - b'A') as usize;
-                if freq[idx] > 0 {
-                    freq[idx] -= 1;
-                } else {
-                    return false;
-                }
-            }
-            ResColor::Gray => {
-                if freq[(t[i] - b'A') as usize] > 0 {
-                    return false;
-                }
-            }
-        };
-    }
-
-    true
+    best
 }
 
 fn main() {
-    // let v = b"HELLO".to_vec();
-    // let mask = (1u32 << 17) | (1u32 << 3);
 
-    // println!("encoded b'L' = {:?}", b32encode(b'L'));
-    // println!("mask = {:?}", mask);
-    // println!("{:?}", letter_is_compatible(mask, v[3]));
+    println!();
 
-    let mut wl_sample = WL_SOL;
-    let mut rng = rand::rng();
-    let (wl_sample, _) = wl_sample[..].partial_shuffle(&mut rng, 200);
+    let pats = PatternTable::build();
 
-    for &t in wl_sample.iter() {
-        let mut t_entropy: usize = 0;
-        for &s in wl_sample.iter() {
-            let res = naive_test(t, s);
-            for &w in wl_sample.iter() {
-                if !naive_is_compatible(res, w) { t_entropy+=1;};
-            }
-        }
-        println!("{} -> {}", str::from_utf8(&t).expect(""), t_entropy);
-    }
+    println!("Solving via entropy_solver:");
+    let best = entropy_solver(&pats, 0, N_SOL);
 
+    println!();
+    println!(
+        "Best word: {}",
+        &str::from_utf8(&WL_TEST[best]).expect("Blah")
+    );
 }
