@@ -1,3 +1,128 @@
+
+===== FILE: colors.rs =====
+use std::fmt;
+
+pub enum Color {
+    Green,
+    Yellow,
+    Gray,
+}
+
+impl fmt::Display for Color {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Color::Green => write!(f, "🟩"),
+            Color::Yellow => write!(f, "🟨"),
+            Color::Gray => write!(f, "⬜"),
+        }
+    }
+}
+
+impl Color {
+    pub const fn encode(&self) -> u32 {
+        match self {
+            Color::Green => 0b11,
+            Color::Yellow => 0b10,
+            Color::Gray => 0b01,
+        }
+    }
+
+    pub const fn decode(c: u32) -> Option<Self> {
+        match c {
+            0b11 => Some(Color::Green),
+            0b10 => Some(Color::Yellow),
+            0b01 => Some(Color::Gray),
+            _ => None,
+        }
+    }
+}
+
+pub fn pat_to_string(mut pat: u32) -> String {
+    let mut s = String::new();
+    while pat != 0u32 {
+        match Color::decode(pat % 4) {
+            Some(c) => s += &c.to_string(),
+            None => s += "?",
+        }
+
+        pat >>= 2;
+    }
+    s
+}
+
+===== FILE: entropy.rs =====
+use crate::wordlist::N;
+use crate::wordlist::N_TEST;
+use crate::wordlist::N_SOL;
+use crate::pattern::PatternTable;
+
+#[inline]
+fn entropy(n_bucket: u16, n_sol: usize) -> f64 {
+    let p = (n_bucket as f64) / (n_sol as f64);
+    -p * p.log2()
+}
+
+pub fn entropy_solver(pats: &PatternTable, _depth: u8, n_sol: usize) -> usize {
+    let mut max_s = -f64::INFINITY;
+    let mut best = 0usize;
+    let mut buckets = [0u16; 1 << (2 * N)];
+    let mut state = [0usize; N_SOL];
+
+    for (i, j) in state.iter_mut().enumerate() {
+        *j = i;
+    }
+
+    eprintln!();
+
+    for i in 0..N_TEST {
+        eprint!("\r{} / {}", i + 1, N_TEST);
+
+        pats.fill_buckets(i, &mut buckets, &state);
+
+        let mut s = 0f64;
+        for &n in &buckets {
+            if n > 0 {
+                s += entropy(n, n_sol);
+            }
+        }
+
+        if s > max_s {
+            best = i;
+            max_s = s;
+        }
+    }
+
+    best
+}
+
+===== FILE: main.rs =====
+use crate::wordlist::N_SOL;
+use crate::wordlist::WL_TEST;
+use crate::pattern::PatternTable;
+use crate::entropy::entropy_solver;
+
+pub mod wordlist;
+pub mod pattern;
+pub mod colors;
+pub mod entropy;
+
+fn main() {
+
+    println!();
+
+    let pats = PatternTable::load_or_build("pattern_table.wdpt");
+
+    println!("Solving via entropy_solver:");
+    let best = entropy_solver(&pats, 0, N_SOL);
+
+    println!();
+    println!(
+        "Best word: {}",
+        &str::from_utf8(&WL_TEST[best]).expect("Blah")
+    );
+}
+
+===== FILE: pattern.rs =====
 use crate::colors::Color;
 use crate::wordlist::N;
 use crate::wordlist::N_SOL;
