@@ -94,6 +94,15 @@ impl PatternTable {
         }
     }
 
+    pub fn fill_bucket_states(&self, i: usize, bucket_states: &mut [Vec<usize>], state: &[usize]) {
+        bucket_states.fill(Vec::new());
+
+        for &j in state {
+            let pat = self.get(i, j);
+            bucket_states[pat as usize].push(j);
+        }
+    }
+
     fn save(&self, path: &str) -> std::io::Result<()> {
         eprintln!("Saving PatternTable to disk at {}", path);
 

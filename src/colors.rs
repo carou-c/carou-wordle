@@ -35,6 +35,14 @@ impl Color {
     }
 }
 
+pub fn encode(colors: &[Color]) -> u32 {
+    let mut pat = 0u32;
+    for (i, color) in colors.iter().enumerate() {
+        pat += color.encode() << (2 * i);
+    }
+    pat
+}
+
 pub fn pat_to_string(mut pat: u32) -> String {
     let mut s = String::new();
     while pat != 0u32 {
