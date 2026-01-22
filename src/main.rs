@@ -34,18 +34,19 @@ fn main() {
                 .expect("Failed to transform word in WL_TEST to UTF-8 string.")
         );
 
-        let mut s = String::new();
+        let mut s: String;
         let t: [u8; N];
 
         loop {
             print!("Your guess (or 'q' to quit): ");
+            s = String::new();
             io::stdout().flush().expect("Failed to flush stdout.");
             io::stdin()
                 .read_line(&mut s)
                 .expect("Failed to read line from stdin.");
             let s = s.trim().as_bytes();
 
-            if s[0] == b'q' {
+            if (s[0] == b'q') || (s[0] == b'Q') {
                 break 'outer;
             }
 
@@ -81,10 +82,9 @@ fn main() {
                     .read_line(&mut s)
                     .expect("Failed to read line from stdin.");
 
-                println!("{:?}", s.trim());
                 match s.trim() {
-                    "G" => res[i] = Color::Green,
-                    "Y" => res[i] = Color::Yellow,
+                    "G" | "g" => res[i] = Color::Green,
+                    "Y" | "y" => res[i] = Color::Yellow,
                     "-" => res[i] = Color::Gray,
                     _ => continue,
                 }
