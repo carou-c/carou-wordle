@@ -94,12 +94,12 @@ impl PatternTable {
         }
     }
 
-    pub fn fill_bucket_states(&self, i: usize, bucket_states: &mut [Vec<usize>], state: &[usize]) {
-        bucket_states.fill(Vec::new());
+    pub fn fill_state_buckets(&self, i: usize, state_buckets: &mut [Vec<usize>], state: &[usize]) {
+        state_buckets.fill(Vec::new());
 
         for &j in state {
             let pat = self.get(i, j);
-            bucket_states[pat as usize].push(j);
+            state_buckets[pat as usize].push(j);
         }
     }
 

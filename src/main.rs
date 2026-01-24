@@ -4,6 +4,7 @@ use std::io::Write;
 use crate::colors::Color;
 use crate::colors::encode;
 use crate::entropy::best_entropy;
+use crate::entropy::entropy_tests;
 use crate::pattern::PatternTable;
 use crate::wordlist::N;
 use crate::wordlist::N_SOL;
@@ -24,17 +25,46 @@ fn main() {
         *j = i;
     }
 
+    let mut s: String;
+
     'outer: loop {
         println!("Solving via entropy_solver:");
-        let (best, _) = best_entropy(&pats, &state);
+        let (best, h) = best_entropy(&pats, &state);
+
         println!();
         println!(
-            "Max entropy word: {}",
+            "Max entropy word: {} ({})",
             &str::from_utf8(&WL_TEST[best])
-                .expect("Failed to transform word in WL_TEST to UTF-8 string.")
+                .expect("Failed to transform word in WL_TEST to UTF-8 string."),
+            h
         );
 
-        let mut s: String;
+        print!("Show top k entropy words? (y [k = 10]/N) ");
+        s = String::new();
+        io::stdout().flush().expect("Failed to flush stdout.");
+        io::stdin()
+            .read_line(&mut s)
+            .expect("Failed to read line from stdin.");
+
+        if s.trim().len() < 3 {
+            s = String::from(s.trim()) + " 10";
+        }
+
+        if let ("y ", k) = s.trim().split_at(2) {
+            let k: usize = k.trim().parse().expect("k is not a valid usize");
+            let mut hs = entropy_tests(&pats, &state);
+            hs.sort_unstable_by(|&(_, h1), &(_, h2)| h2.total_cmp(&h1));
+            for (i, &(w, hw)) in hs[..k].iter().enumerate() {
+                println!(
+                    "{}. {} ({})",
+                    i + 1,
+                    str::from_utf8(&WL_TEST[w])
+                        .expect("Failed to transform word in WL_TEST to UTF-8 string."),
+                    hw
+                )
+            }
+        }
+
         let t: [u8; N];
 
         loop {
@@ -95,12 +125,12 @@ fn main() {
 
         let pat = encode(&res);
 
-        let mut bucket_states = [const { Vec::new() }; 1 << (2 * N)];
+        let mut state_buckets = [const { Vec::new() }; 1 << (2 * N)];
         let i = WL_TEST.binary_search(&t).expect("Test word not found.");
 
-        pats.fill_bucket_states(i, &mut bucket_states, &state);
+        pats.fill_state_buckets(i, &mut state_buckets, &state);
 
-        state = bucket_states[pat as usize].clone();
+        state = state_buckets[pat as usize].clone();
         println!();
 
         print!(
@@ -116,14 +146,26 @@ fn main() {
         match s.trim() {
             "n" => continue,
             _ => {
-                let ws: Vec<&str> = state
+                let hs = entropy_tests(&pats, &state);
+                let mut state_sorted: Vec<([u8; N], f64)> = state
                     .iter()
-                    .map(|&w| {
-                        str::from_utf8(&WL_SOL[w])
-                            .expect("Failed to transform word in WL_TEST to UTF-8 string.")
+                    .map(|&s| {
+                        let w = WL_SOL[s];
+                        let test_idx = WL_TEST
+                            .binary_search(&w)
+                            .expect("Failed to find word in WL_SOL in WL_TEST");
+                        (w, hs[test_idx].1)
                     })
                     .collect();
-                println!("{:#?}", ws);
+                state_sorted.sort_unstable_by(|&(_, h1), &(_, h2)| h2.total_cmp(&h1));
+                for (w, h) in state_sorted {
+                    println!(
+                        "{} ({})",
+                        str::from_utf8(&w)
+                            .expect("Failed to transform word in WL_SOL to UTF-8 string."),
+                        h
+                    );
+                }
             }
         }
     }
